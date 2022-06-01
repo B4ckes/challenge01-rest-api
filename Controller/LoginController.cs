@@ -24,7 +24,7 @@ namespace RestApi.Controller
             
             if (user.Password != model.Password) return BadRequest("Email ou senha incorretos");
 
-            return Ok(user.Id);
+            return Ok(user);
         }
     }
 }

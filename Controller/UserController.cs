@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
@@ -22,9 +23,13 @@ namespace RestApi.Controller
         {
             if (!ModelState.IsValid) return BadRequest();
 
-            var existentUser = await context.Users.FirstOrDefaultAsync(u => u.Email.Equals(model.Email));
+            var existentUsername = await context.Users.FirstOrDefaultAsync(u => u.Username.Equals(model.Username));
 
-            if (existentUser != null) return BadRequest("Já existe um cadastro com este email.");
+            if (existentUsername != null) return BadRequest("Nome de usuário já está em uso.");
+            
+            var existentEmail = await context.Users.FirstOrDefaultAsync(u => u.Email.Equals(model.Email));
+
+            if (existentEmail != null) return BadRequest("Já existe um cadastro com este email.");
 
             var user = new User
             {
@@ -37,7 +42,7 @@ namespace RestApi.Controller
             {
                 await context.Users.AddAsync(user);
                 await context.SaveChangesAsync();
-                return Created($"v1/user/{user.Id}", user);
+                return Ok(user);
             }
             catch
             {
@@ -90,10 +95,27 @@ namespace RestApi.Controller
 
             if (user == null) return NotFound();
 
+            if (!model.Username.Equals(user.Username))
+            {
+                var existentUsername = await context.Users.FirstOrDefaultAsync(u => u.Username.Equals(model.Username));
+
+                if (existentUsername != null) return BadRequest("Nome de usuário já está em uso.");
+            }
+
+            if (!model.Email.Equals(user.Email))
+            {
+                var existentEmail = await context.Users.FirstOrDefaultAsync(u => u.Email.Equals(model.Email));
+
+                if (existentEmail != null) return BadRequest("Já existe um cadastro com este email.");
+            }
+            
+            var hasPasswordInModel = !string.IsNullOrEmpty(model.Password);
+
             try
             {
-                user.Username = model.Username ?? user.Username;
-                user.Email = model.Email ?? user.Email;
+                user.Username = model.Username;
+                user.Email = model.Email;
+                user.Password = hasPasswordInModel ? model.Password : user.Password;
 
                 context.Users.Update(user);
                 await context.SaveChangesAsync();
@@ -135,12 +157,27 @@ namespace RestApi.Controller
             [FromRoute] int id
         )
         {
-            var scores = await context
-                .Scores
+            var user = await context.Users.FirstOrDefaultAsync(u => u.Id == id);
+
+            var scores = await context.Scores
                 .Where(s => s.UserId == id)
+                .OrderBy(s => s.ScoreAmount)
+                .Reverse()
                 .ToListAsync();
 
-            return Ok(scores);
+            List<ScoreResultViewModel> scoresResult = new List<ScoreResultViewModel>();
+
+            foreach (var score in scores)
+            {
+                scoresResult.Add(new ScoreResultViewModel
+                    {
+                        Username = user.Username,
+                        ScoreAmount = score.ScoreAmount
+                    }
+                );
+            }
+
+            return Ok(scoresResult);
         }
     }
 }

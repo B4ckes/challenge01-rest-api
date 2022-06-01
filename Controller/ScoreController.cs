@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
@@ -43,19 +44,21 @@ namespace RestApi.Controller
             [FromServices] AppDbContext context
         )
         {
-            var scores = await context.Scores.ToListAsync();
-
-            return Ok(scores);
-        }
-
-        [HttpGet("scores/ordered")]
-        public async Task<IActionResult> GetOrderedAsync(
-            [FromServices] AppDbContext context
-        )
-        {
             var scores = await context.Scores.OrderBy(s => s.ScoreAmount).Reverse().ToListAsync();
 
-            return Ok(scores);
+            List<ScoreResultViewModel> scoresResult = new List<ScoreResultViewModel>();
+            
+            foreach (var score in scores)
+            {
+                scoresResult.Add(new ScoreResultViewModel
+                {
+                  Username = context.Users.FirstOrDefaultAsync(u => u.Id == score.UserId).Result?.Username ?? "<DELETED>",
+                  ScoreAmount = score.ScoreAmount
+                }
+                );
+            }
+
+            return Ok(scoresResult);
         }
     }
 }
